@@ -1,0 +1,2 @@
+node_modules/
+persistent-data/ # Para a persistência da sessão
