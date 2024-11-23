@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js'); // WhatsApp client com LocalAuth
+const { Client } = require('whatsapp-web.js'); // WhatsApp client
 const qrcode = require('qrcode'); // Para gerar o QR Code
 const nodemailer = require('nodemailer'); // Para enviar o QR Code por email
 const { createClient } = require('@supabase/supabase-js'); // Supabase client
@@ -45,22 +45,17 @@ async function getSessionData() {
 const client = new Client({
     authStrategy: {
         async saveAuthInfo(session) {
-            await saveSessionData(session); // Persistir no Supabase
+            await saveSessionData(session); // Salva os dados da sessão no Supabase
         },
         async loadAuthInfo() {
-            const session = await getSessionData(); // Carregar do Supabase
-            return session ? session : {}; // Retorna uma sessão vazia se não houver
+            return await getSessionData(); // Recupera os dados da sessão do Supabase
         },
-        clearAuthInfo: async () => {
+        async clearAuthInfo() {
             await supabase
                 .from(SESSION_TABLE)
                 .delete()
-                .eq('id', SESSION_ID); // Limpar sessão do Supabase
+                .eq('id', SESSION_ID); // Deleta os dados da sessão
         }
-    },
-    puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 });
 
@@ -131,54 +126,4 @@ client.on('message', async (msg) => {
         }, 3000);
         return;
     }
-
-    // Lógica para resposta de opções
-    switch (msg.body) {
-        case '1': // Como funciona
-            await chat.sendStateTyping();
-            setTimeout(async () => {
-                await client.sendMessage(msg.from, 'Nosso serviço oferece consultas médicas 24 horas por dia...');
-            }, 3000);
-            break;
-
-        case '2': // Valores dos planos
-            await chat.sendStateTyping();
-            setTimeout(async () => {
-                await client.sendMessage(msg.from, 'Planos disponíveis: Individual: R$22,50, Família: R$39,90...');
-            }, 3000);
-            break;
-
-        case '3': // Benefícios
-            await chat.sendStateTyping();
-            setTimeout(async () => {
-                await client.sendMessage(msg.from, 'Benefícios: Atendimento médico ilimitado 24h...');
-            }, 3000);
-            break;
-
-        case '4': // Como aderir
-            await chat.sendStateTyping();
-            setTimeout(async () => {
-                await client.sendMessage(msg.from, 'Você pode aderir diretamente pelo nosso site...');
-            }, 3000);
-            break;
-
-        case '5': // Outras perguntas
-            await chat.sendStateTyping();
-            setTimeout(async () => {
-                await client.sendMessage(msg.from, 'Fale aqui ou visite nosso site...');
-            }, 3000);
-            break;
-
-        default: // Mensagem de erro
-            await chat.sendStateTyping();
-            setTimeout(async () => {
-                await client.sendMessage(msg.from, 'Desculpe, não entendi. Escolha uma opção válida.');
-            }, 2000);
-            break;
-    }
-});
-
-// Tratamento de erro
-client.on('error', (error) => {
-    console.error('Erro detectado:', error);
 });
