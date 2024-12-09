@@ -2,3 +2,5 @@ node_modules/
 persistent-data/ 
 .env
 .wwebjs_cache/
+.wwebjs_auth/
+RemoteAuth/
