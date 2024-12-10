@@ -163,55 +163,57 @@ const initializeWhatsAppClient = async () => {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     // **Evento: Mensagem recebida**
     client.on('message', async (msg) => {
+      // Verifica se a mensagem contém palavras-chave e responde a qualquer remetente
       if (
-        msg.body.match(/(menu|Menu|dia|tarde|noite|oi|Oi|Olá|olá|ola|Ola)/i) &&
-        msg.from.endsWith('@c.us')
+        msg.body.match(/(menu|Menu|dia|tarde|noite|oi|Oi|Olá|olá|ola|Ola)/i)
       ) {
         const chat = await msg.getChat();
         const contact = await msg.getContact();
-        const name = contact.pushname;
-  
+        const name = contact.pushname || 'Usuário';
+    
         await client.sendMessage(
           msg.from,
           `Olá, ${name.split(' ')[0]}! Sou o assistente virtual da empresa. Como posso ajudar?\n1 - Como funciona\n2 - Planos\n3 - Benefícios`
         );
       }
-  
-      if (msg.body === '1' && msg.from.endsWith('@c.us')) {
+    
+      // Respostas adicionais para outras interações
+      if (msg.body === '1') {
         const chat = await msg.getChat();
-  
+    
         await delay(3000);
         await chat.sendStateTyping();
         await delay(3000);
-  
+    
         await client.sendMessage(
           msg.from,
           'Nosso serviço oferece consultas médicas 24 horas por dia, 7 dias por semana, diretamente pelo WhatsApp. Sem carência e com benefícios ilimitados.'
         );
         await delay(3000);
-  
+    
         await client.sendMessage(
           msg.from,
           'COMO FUNCIONA?\n1. Faça seu cadastro.\n2. Efetue o pagamento.\n3. Comece a usar imediatamente!'
         );
-  
+    
         await delay(3000);
         await client.sendMessage(msg.from, 'Link para cadastro: https://site.com');
       }
-  
-      if (msg.body === '2' && msg.from.endsWith('@c.us')) {
+    
+      if (msg.body === '2') {
         const chat = await msg.getChat();
-  
+    
         await delay(3000);
         await chat.sendStateTyping();
         await delay(3000);
-  
+    
         await client.sendMessage(
           msg.from,
           'Planos disponíveis:\n\nIndividual: R$22,50/mês\nFamília: R$39,90/mês (até 4 membros)\n\nPara mais detalhes, acesse: https://site.com'
         );
       }
     });
+    
   
     // Inicializar cliente do WhatsApp
     client.initialize();
