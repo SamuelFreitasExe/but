@@ -159,7 +159,8 @@ const initializeWhatsAppClient = async () => {
       .delete()
       .eq('id', 'default_session');
   });
-   
+
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     // **Evento: Mensagem recebida**
     client.on('message', async (msg) => {
       if (
