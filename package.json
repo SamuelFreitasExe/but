@@ -8,13 +8,14 @@
     },
     "dependencies": {
         "@sendgrid/mail": "^8.1.4",
-        "@supabase/supabase-js": "^2.46.2",
-        "axios": "^1.7.7",
-        "dotenv": "^16.4.5",
+        "@supabase/supabase-js": "^2.54.0",
+        "axios": "^1.11.0",
+        "dotenv": "^16.6.1",
         "express": "^4.21.2",
         "nodemailer": "^6.9.16",
         "qrcode": "^1.5.4",
         "qrcode-terminal": "^0.12.0",
-        "whatsapp-web.js": "^1.26.0"
+        "supabase": "^2.33.7",
+        "whatsapp-web.js": "^1.32.0"
     }
 }

@@ -1,6 +1,6 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-const { Client } = require('whatsapp-web.js');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const qrcode = require('qrcode');
 const axios = require('axios');
@@ -9,28 +9,7 @@ require('dotenv').config();
 // Configuração do Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Funções do Supabase e WhatsApp já implementadas
-const testSupabaseConnection = async () => {
-  try {
-    const { data, error } = await supabase.from('whatsapp_sessions').select('*').limit(1);
-    if (error) {
-      console.error('Erro ao tentar conectar ao Supabase:', error.message);
-      return false;
-    }
-
-    if (data && data.length > 0) {
-      console.log('Conexão bem-sucedida com o Supabase. Dados retornados:', data);
-      return true;
-    } else {
-      console.log('Conexão bem-sucedida com o Supabase, mas não há dados na tabela.');
-      return true;
-    }
-  } catch (error) {
-    console.error('Erro na conexão com o Supabase:', error.message);
-    return false;
-  }
-};
-
+// Função para buscar a sessão no Supabase
 const getSessionFromSupabase = async () => {
   const { data, error } = await supabase
     .from('whatsapp_sessions')
@@ -43,67 +22,48 @@ const getSessionFromSupabase = async () => {
     return null;
   }
 
-  if (!data) {
-    console.log('Nenhuma sessão encontrada, criando uma nova.');
-    await createInitialSession();
+  if (!data?.session_data) {
+    console.log('Nenhuma sessão encontrada no Supabase. Será necessário escanear o QR Code.');
     return null;
   }
 
-  return JSON.parse(data.session_data);
+  return data?.session_data || null;
 };
 
-const createInitialSession = async () => {
-  const initialSessionData = {
-    WABrowserId: "abc",
-    WASecretBundle: "xyz",
-    WAToken1: "123",
-    WAToken2: "456"
-  };
-
-  const { error } = await supabase
-    .from('whatsapp_sessions')
-    .upsert({
-      id: 'default_session',
-      session_data: JSON.stringify(initialSessionData),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
-
-  if (error) {
-    console.error('Erro ao criar sessão inicial:', error.message);
-  } else {
-    console.log('Sessão inicial criada no Supabase!');
-  }
-};
-
+// Função para salvar a sessão no Supabase
 const saveSessionToSupabase = async (session) => {
-  if (!session || !session.WABrowserId || !session.WASecretBundle || !session.WAToken1 || !session.WAToken2) {
-    console.error('Sessão inválida. Dados de sessão incompletos.');
-    return;
-  }
+  try {
+    if (!session || Object.keys(session).length === 0) {
+      console.error('Sessão inválida para salvar: objeto vazio.');
+      return;
+    }
 
-  const { error } = await supabase
-    .from('whatsapp_sessions')
-    .upsert({
-      id: 'default_session',
-      session_data: JSON.stringify(session),
-      updated_at: new Date().toISOString(),
-    });
+    const { error } = await supabase
+      .from('whatsapp_sessions')
+      .upsert({
+        id: 'default_session',
+        session_data: JSON.stringify(session),
+        updated_at: new Date().toISOString(),
+      });
 
-  if (error) {
-    console.error('Erro ao salvar sessão:', error.message);
-  } else {
-    console.log('Sessão salva no Supabase com sucesso!');
+    if (error) {
+      console.error('Erro ao salvar sessão no Supabase:', error.message);
+    } else {
+      console.log('Sessão salva no Supabase com sucesso!');
+    }
+  } catch (err) {
+    console.error('Erro ao processar sessão para salvar:', err.message);
   }
 };
 
+// Função para enviar QR Code por e-mail via Brevo
 const sendEmailWithQRCode = async (qrImage) => {
   try {
     const base64Image = qrImage.split(',')[1];
     const emailData = {
       sender: { email: process.env.EMAIL_FROM, name: 'Bot Assistente' },
       to: [{ email: process.env.EMAIL_TO, name: 'Usuário' }],
-      subject: 'QR Code para Conectar o Bot',
+      subject: 'QR Code para conectar o bot',
       htmlContent: `<p>Escaneie o QR Code para conectar o bot ao WhatsApp:</p><img src="data:image/png;base64,${base64Image}" alt="QR Code">`,
       attachments: [
         {
@@ -112,114 +72,104 @@ const sendEmailWithQRCode = async (qrImage) => {
         },
       ],
     };
+
     const response = await axios.post('https://api.brevo.com/v3/smtp/email', emailData, {
       headers: {
         'api-key': process.env.BREVO_API_KEY,
         'Content-Type': 'application/json',
       },
     });
+
     console.log('QR Code enviado por e-mail com sucesso!', response.data);
   } catch (error) {
     console.error('Erro ao enviar QR Code por e-mail:', error.response?.data || error.message);
   }
 };
 
+// Inicializa o cliente do WhatsApp Web
 const initializeWhatsAppClient = async () => {
   const sessionData = await getSessionFromSupabase();
 
   const client = new Client({
-    session: sessionData,
+    authStrategy: new LocalAuth({ clientId: "default" }),
+    session: sessionData || undefined
   });
 
   client.on('qr', async (qr) => {
-    console.log('QR Code gerado. Escaneie para conectar!');
+    console.log('QR Code gerado, escaneie para conectar:');
     qrcodeTerminal.generate(qr, { small: true });
 
     try {
       const qrImage = await qrcode.toDataURL(qr);
       await sendEmailWithQRCode(qrImage);
     } catch (error) {
-      console.error('Erro ao processar o QR Code:', error.message);
+      console.error('Erro ao gerar ou enviar QR Code:', error.message);
     }
   });
 
-  client.on('authenticated', (session) => {
-    console.log('Sessão autenticada:', session);
-    saveSessionToSupabase(session);
+  client.on('authenticated', async () => {
+    console.log('Sessão autenticada com sucesso!');
+    const authData = client.pupPage ? await client.pupPage.evaluate(() => localStorage) : {};
+    await saveSessionToSupabase(authData);
   });
 
   client.on('ready', () => {
     console.log('Bot conectado e pronto para uso!');
   });
 
-  client.on('disconnected', async (reason) => {
+  client.on('disconnected', (reason) => {
     console.log('Cliente desconectado:', reason);
-    await supabase
-      .from('whatsapp_sessions')
-      .delete()
-      .eq('id', 'default_session');
   });
 
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    // **Evento: Mensagem recebida**
-    client.on('message', async (msg) => {
-      // Verifica se a mensagem contém palavras-chave e responde a qualquer remetente
-      if (
-        msg.body.match(/(menu|Menu|dia|tarde|noite|oi|Oi|Olá|olá|ola|Ola)/i)
-      ) {
-        const chat = await msg.getChat();
-        const contact = await msg.getContact();
-        const name = contact.pushname || 'Usuário';
-    
-        await client.sendMessage(
-          msg.from,
-          `Olá, ${name.split(' ')[0]}! Sou o assistente virtual da empresa. Como posso ajudar?\n1 - Como funciona\n2 - Planos\n3 - Benefícios`
-        );
-      }
-    
-      // Respostas adicionais para outras interações
-      if (msg.body === '1') {
-        const chat = await msg.getChat();
-    
-        await delay(3000);
-        await chat.sendStateTyping();
-        await delay(3000);
-    
-        await client.sendMessage(
-          msg.from,
-          'Nosso serviço oferece consultas médicas 24 horas por dia, 7 dias por semana, diretamente pelo WhatsApp. Sem carência e com benefícios ilimitados.'
-        );
-        await delay(3000);
-    
-        await client.sendMessage(
-          msg.from,
-          'COMO FUNCIONA?\n1. Faça seu cadastro.\n2. Efetue o pagamento.\n3. Comece a usar imediatamente!'
-        );
-    
-        await delay(3000);
-        await client.sendMessage(msg.from, 'Link para cadastro: https://site.com');
-      }
-    
-      if (msg.body === '2') {
-        const chat = await msg.getChat();
-    
-        await delay(3000);
-        await chat.sendStateTyping();
-        await delay(3000);
-    
-        await client.sendMessage(
-          msg.from,
-          'Planos disponíveis:\n\nIndividual: R$22,50/mês\nFamília: R$39,90/mês (até 4 membros)\n\nPara mais detalhes, acesse: https://site.com'
-        );
-      }
-    });
-    
-  
-    // Inicializar cliente do WhatsApp
-    client.initialize();
-  };
-  
-// Inicialização do Express
+  const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+
+  client.on('message', async (msg) => {
+    const text = msg.body.trim().toLowerCase();
+
+    if (/^(menu|bom dia|boa tarde|boa noite|oi|olá|ola)$/i.test(msg.body)) {
+      const contact = await msg.getContact();
+      const name = contact.pushname || 'Usuário';
+
+      await client.sendMessage(
+        msg.from,
+        `Olá, ${name.split(' ')[0]}! Sou o assistente virtual da empresa. Como posso ajudar?\n1 - Como funciona\n2 - Planos\n3 - Benefícios`
+      );
+    }
+
+    if (text === '1') {
+      const chat = await msg.getChat();
+      await delay(2000);
+      await chat.sendStateTyping();
+      await delay(2000);
+      await client.sendMessage(
+        msg.from,
+        'Nosso serviço oferece consultas médicas 24 horas por dia, 7 dias por semana, diretamente pelo WhatsApp. Sem carência e com benefícios ilimitados.'
+      );
+      await delay(2000);
+      await client.sendMessage(
+        msg.from,
+        'COMO FUNCIONA?\n1. Faça seu cadastro.\n2. Efetue o pagamento.\n3. Comece a usar imediatamente!'
+      );
+      await delay(2000);
+      await client.sendMessage(msg.from, 'Link para cadastro: https://site.com');
+    }
+
+    if (text === '2') {
+      const chat = await msg.getChat();
+      await delay(2000);
+      await chat.sendStateTyping();
+      await delay(2000);
+      await client.sendMessage(
+        msg.from,
+        'Planos disponíveis:\n\nIndividual: R$22,50/mês\nFamília: R$39,90/mês (até 4 membros)\n\nPara mais detalhes, acesse: https://site.com'
+      );
+    }
+  });
+
+  client.initialize();
+};
+
+// Express para manter servidor rodando e endpoints básicos
 const app = express();
 const PORT = process.env.PORT || 3000;
 
