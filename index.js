@@ -6,6 +6,8 @@ const qrcode = require('qrcode');
 const axios = require('axios');
 require('dotenv').config();
 
+let qrCodeImage = null; // 🔹 variável global para armazenar o QR gerado
+
 // Configuração do Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -100,8 +102,8 @@ const initializeWhatsAppClient = async () => {
     qrcodeTerminal.generate(qr, { small: true });
 
     try {
-      const qrImage = await qrcode.toDataURL(qr);
-      await sendEmailWithQRCode(qrImage);
+      qrCodeImage = await qrcode.toDataURL(qr); // 🔹 salva a imagem para servir na rota /qr
+      await sendEmailWithQRCode(qrCodeImage);
     } catch (error) {
       console.error('Erro ao gerar ou enviar QR Code:', error.message);
     }
@@ -115,6 +117,7 @@ const initializeWhatsAppClient = async () => {
 
   client.on('ready', () => {
     console.log('Bot conectado e pronto para uso!');
+    qrCodeImage = null; // 🔹 limpa a imagem do QR, não é mais necessária
   });
 
   client.on('disconnected', (reason) => {
@@ -179,6 +182,22 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Bot ativo e saudável' });
+});
+
+// 🔹 Nova rota para visualizar QR no navegador
+app.get('/qr', (req, res) => {
+  if (qrCodeImage) {
+    res.send(`
+      <html>
+        <body style="text-align:center; font-family:sans-serif;">
+          <h2>Escaneie o QR Code para conectar o bot</h2>
+          <img src="${qrCodeImage}" />
+        </body>
+      </html>
+    `);
+  } else {
+    res.send('<h3>✅ Nenhum QR disponível no momento. Bot já conectado ou aguardando gerar QR...</h3>');
+  }
 });
 
 (async () => {
