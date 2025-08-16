@@ -1,21 +1,21 @@
 {
-    "name": "eurobo",
-    "version": "1.0.0",
-    "description": "Bot de WhatsApp usando whatsapp-web.js",
-    "main": "index.js",
-    "scripts": {
-        "start": "node index.js"
-    },
-    "dependencies": {
-        "@sendgrid/mail": "^8.1.4",
-        "@supabase/supabase-js": "^2.54.0",
-        "axios": "^1.11.0",
-        "dotenv": "^16.6.1",
-        "express": "^4.21.2",
-        "nodemailer": "^6.9.16",
-        "qrcode": "^1.5.4",
-        "qrcode-terminal": "^0.12.0",
-        "supabase": "^2.33.7",
-        "whatsapp-web.js": "^1.32.0"
-    }
+  "name": "eurobo",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp com whatsapp-web.js, Puppeteer e Supabase, envio de QR via Brevo",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Samuel Freitas",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.10.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "puppeteer": "^24.4.0",
+    "whatsapp-web.js": "^1.20.0",
+    "qrcode": "^1.5.1",
+    "qrcode-terminal": "^0.12.0"
+  }
 }

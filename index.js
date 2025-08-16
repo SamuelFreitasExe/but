@@ -94,8 +94,13 @@ const initializeWhatsAppClient = async () => {
 
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: "default" }),
-    session: sessionData || undefined
+    session: sessionData || undefined,
+    puppeteer: {
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
   });
+
 
   client.on('qr', async (qr) => {
     console.log('QR Code gerado, escaneie para conectar:');
