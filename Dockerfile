@@ -1,7 +1,6 @@
-# Usa Node.js oficial
 FROM node:20
 
-# Instala Chromium e dependências
+# Instala Chromium e dependências completas
 RUN apt-get update && apt-get install -y \
     chromium \
     libatk-bridge2.0-0 \
@@ -25,20 +24,26 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     wget \
     ca-certificates \
+    libc6 \
+    libcairo2 \
+    libdbus-1-3 \
+    libgconf-2-4 \
+    libgtk-3-0 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libnspr4 \
+    libstdc++6 \
     --no-install-recommends \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
-# Define pasta de trabalho
 WORKDIR /app
 
-# Copia arquivos do projeto
 COPY package*.json ./
 RUN npm install
 COPY . .
 
-# Porta
 EXPOSE 3000
 
-# Comando para iniciar
 CMD ["npm", "start"]
