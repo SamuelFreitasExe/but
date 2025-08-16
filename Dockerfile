@@ -1,7 +1,7 @@
 # Imagem base Puppeteer + Node pronta para headless
 FROM ghcr.io/puppeteer/puppeteer:20.1.0
 
-# Instala bibliotecas adicionais do Linux que Puppeteer/Chromium precisa
+# Instala bibliotecas adicionais necessárias para Chromium
 RUN apt-get update && apt-get install -y \
     gconf-service \
     libasound2 \
@@ -39,23 +39,20 @@ RUN apt-get update && apt-get install -y \
     libappindicator1 \
     xdg-utils \
     wget \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Define a pasta de trabalho
+# Pasta de trabalho
 WORKDIR /app
 
-# Copia package.json e package-lock.json
+# Copia package.json e instala dependências
 COPY package*.json ./
-
-# Instala dependências do Node
 RUN npm install
 
-# Copia todo o resto do projeto
+# Copia todo o projeto
 COPY . .
 
-# Expõe a porta da aplicação
+# Porta
 EXPOSE 3000
 
-# Comando para iniciar a aplicação
+# Inicia aplicação
 CMD ["npm", "start"]
