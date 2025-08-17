@@ -1,58 +1,48 @@
-# Imagem base Puppeteer + Node pronta para headless
-FROM ghcr.io/puppeteer/puppeteer:20.1.0
+# Base: Ubuntu 22.04
+FROM ubuntu:22.04
 
-# Instala bibliotecas adicionais necessárias para Chromium
+# Evita perguntas interativas
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instala Node.js, npm e dependências necessárias para Puppeteer/Chromium
 RUN apt-get update && apt-get install -y \
-    gconf-service \
-    libasound2 \
-    libatk1.0-0 \
-    libc6 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libgcc1 \
-    libgconf-2-4 \
-    libgdk-pixbuf2.0-0 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libstdc++6 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
+    curl \
+    gnupg \
     ca-certificates \
+    nodejs \
+    npm \
+    chromium-browser \
+    libatk1.0-0 \
+    libnss3 \
+    libxss1 \
+    libx11-xcb1 \
+    libgtk-3-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libasound2 \
     fonts-liberation \
-    libappindicator1 \
     xdg-utils \
     wget \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Pasta de trabalho
+# Define pasta de trabalho
 WORKDIR /app
 
-# Copia package.json e instala dependências
+# Copia package.json e package-lock.json
 COPY package*.json ./
+
+# Instala dependências do Node
 RUN npm install
 
 # Copia todo o projeto
 COPY . .
 
-# Porta
+# Configura Puppeteer para usar o Chromium do sistema
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+# Expõe a porta da aplicação
 EXPOSE 3000
 
-# Inicia aplicação
+# Comando para iniciar a aplicação
 CMD ["npm", "start"]
