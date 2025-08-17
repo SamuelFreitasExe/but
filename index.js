@@ -29,7 +29,17 @@ const getSessionFromSupabase = async () => {
     return null;
   }
 
-  return JSON.parse(data.session_data);
+  // 🔹 Se session_data for string, faz parse, se já for objeto retorna direto
+  if (typeof data.session_data === 'string') {
+    try {
+      return JSON.parse(data.session_data);
+    } catch (err) {
+      console.error('Erro ao parsear sessão do Supabase:', err.message);
+      return null;
+    }
+  } else {
+    return data.session_data; // já é objeto
+  }
 };
 
 // Função para salvar sessão
