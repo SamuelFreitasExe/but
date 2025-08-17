@@ -1,10 +1,10 @@
 # Base: Ubuntu 22.04
 FROM ubuntu:22.04
 
-# Evita perguntas interativas
+# Evita perguntas interativas durante a instalação
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Instala Node.js, npm e dependências necessárias para Puppeteer/Chromium
+# Atualiza repositórios e instala Node, npm, Chromium e bibliotecas necessárias
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     npm \
     chromium-browser \
     libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
     libnss3 \
     libxss1 \
     libx11-xcb1 \
