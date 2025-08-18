@@ -1,7 +1,6 @@
 # Base Node 20 slim
 FROM node:20-slim
 
-# Evita interações durante instalação
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Instala bibliotecas necessárias para Puppeteer/Chromium
@@ -9,34 +8,33 @@ RUN apt-get update && apt-get install -y \
     chromium \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libnss3 \
-    libxss1 \
-    libasound2 \
-    libgconf-2-4 \
     libcups2 \
-    libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libglib2.0-0 \
-    libnspr4 \
-    libstdc++6 \
-    libx11-6 \
+    libdrm2 \
+    libx11-xcb1 \
     libxcomposite1 \
     libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
     libxrandr2 \
     libxrender1 \
+    libxss1 \
     libxtst6 \
-    libgbm-dev \
+    libnss3 \
+    libgbm1 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libgtk-3-0 \
+    libxshmfence1 \
+    ca-certificates \
     fonts-liberation \
-    xdg-utils \
+    libwoff1 \
+    libharfbuzz0b \
     wget \
- && apt-get clean && rm -rf /var/lib/apt/lists/*
+    xdg-utils \
+    --no-install-recommends \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
-# Pasta de trabalho
+# Define a pasta de trabalho
 WORKDIR /app
 
 # Copia package.json e package-lock.json
@@ -45,13 +43,13 @@ COPY package*.json ./
 # Instala dependências Node
 RUN npm install
 
-# Copia todo o projeto
+# Copia o restante do projeto
 COPY . .
 
-# Configura Puppeteer para usar o Chromium do sistema
+# Configura Puppeteer para usar Chromium do sistema
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Expõe a porta que sua app usa
+# Porta do servidor
 EXPOSE 3000
 
 # Comando para iniciar o bot
