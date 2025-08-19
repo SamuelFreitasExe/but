@@ -77,64 +77,53 @@ const sendEmailWithQRCode = async (qrImage) => {
 };
 
 // Inicializa o cliente WhatsApp
+// Inicializa o cliente WhatsApp
 const initializeWhatsAppClient = async () => {
   const sessionData = await getSessionFromSupabase();
 
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: "default" }),
     session: sessionData || undefined,
-    puppeteer: { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+    puppeteer: {
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-gpu"
+      ],
+    },
   });
 
-  client.on('qr', async (qr) => {
-    console.log('QR Code gerado, escaneie para conectar:');
+  client.on("qr", async (qr) => {
+    console.log("QR Code gerado, escaneie para conectar:");
     qrcodeTerminal.generate(qr, { small: true });
     qrCodeImage = await qrcode.toDataURL(qr);
     await sendEmailWithQRCode(qrCodeImage);
   });
 
-  client.on('authenticated', async (session) => {
-    console.log('Sessão autenticada!');
+  client.on("authenticated", async (session) => {
+    console.log("Sessão autenticada!");
     await saveSessionToSupabase(session);
     qrCodeImage = null;
   });
 
-  client.on('ready', () => {
-    console.log('Bot pronto e conectado!');
+  client.on("ready", () => {
+    console.log("✅ Bot pronto e conectado!");
     qrCodeImage = null;
   });
 
-  client.on('disconnected', (reason) => {
-    console.log('Cliente desconectado:', reason);
+  client.on("disconnected", (reason) => {
+    console.log("❌ Cliente desconectado:", reason);
     qrCodeImage = null;
   });
 
-  // Mensagens automáticas
-  client.on('message', async (msg) => {
-    const text = msg.body.trim().toLowerCase();
-    const chat = await msg.getChat();
-
-    if (/^(menu|bom dia|boa tarde|boa noite|oi|olá|ola)$/i.test(msg.body)) {
-      const contact = await msg.getContact();
-      const name = contact.pushname || 'Usuário';
-      await client.sendMessage(
-        msg.from,
-        `Olá, ${name.split(' ')[0]}! Sou o assistente virtual. Como posso ajudar?\n1 - Como funciona\n2 - Planos\n3 - Benefícios`
-      );
-    }
-
-    if (text === '1') {
-      await chat.sendStateTyping();
-      await client.sendMessage(msg.from, 'Nosso serviço oferece consultas médicas 24h por dia...');
-      await client.sendMessage(msg.from, 'COMO FUNCIONA?\n1. Cadastro\n2. Pagamento\n3. Uso imediato');
-      await client.sendMessage(msg.from, 'Link para cadastro: https://site.com');
-    }
-
-    if (text === '2') {
-      await chat.sendStateTyping();
-      await client.sendMessage(msg.from, 'Planos disponíveis:\nIndividual: R$22,50/mês\nFamília: R$39,90/mês');
-      await client.sendMessage(msg.from, 'Mais detalhes: https://site.com');
-    }
+  // Mantém o client ativo mesmo após falhas pequenas
+  client.on("auth_failure", (msg) => {
+    console.error("⚠️ Falha na autenticação:", msg);
   });
 
   client.initialize();
