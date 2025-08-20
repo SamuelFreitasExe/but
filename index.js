@@ -11,7 +11,7 @@ let qrCodeImage = null; // QR gerado temporariamente
 // Configuração do Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Função para buscar sessão
+// Função para buscar sessão no Supabase
 const getSessionFromSupabase = async () => {
   const { data, error } = await supabase
     .from('whatsapp_sessions')
@@ -29,7 +29,6 @@ const getSessionFromSupabase = async () => {
     return null;
   }
 
-  // 🔹 Se session_data for string, faz parse, se já for objeto retorna direto
   if (typeof data.session_data === 'string') {
     try {
       return JSON.parse(data.session_data);
@@ -38,11 +37,11 @@ const getSessionFromSupabase = async () => {
       return null;
     }
   } else {
-    return data.session_data; // já é objeto
+    return data.session_data;
   }
 };
 
-// Função para salvar sessão
+// Função para salvar sessão no Supabase
 const saveSessionToSupabase = async (session) => {
   if (!session || Object.keys(session).length === 0) return;
   const { error } = await supabase
@@ -56,7 +55,7 @@ const saveSessionToSupabase = async (session) => {
   else console.log('Sessão salva com sucesso no Supabase!');
 };
 
-// Função para enviar QR por e-mail
+// Função para enviar QR Code por e-mail via Brevo
 const sendEmailWithQRCode = async (qrImage) => {
   try {
     const base64Image = qrImage.split(',')[1];
@@ -76,7 +75,6 @@ const sendEmailWithQRCode = async (qrImage) => {
   }
 };
 
-// Inicializa o cliente WhatsApp
 // Inicializa o cliente WhatsApp
 const initializeWhatsAppClient = async () => {
   const sessionData = await getSessionFromSupabase();
@@ -121,9 +119,52 @@ const initializeWhatsAppClient = async () => {
     qrCodeImage = null;
   });
 
-  // Mantém o client ativo mesmo após falhas pequenas
   client.on("auth_failure", (msg) => {
     console.error("⚠️ Falha na autenticação:", msg);
+  });
+
+  // Listener de mensagens
+  client.on('message', async (msg) => {
+    const text = msg.body.trim().toLowerCase();
+    const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+    if (/^(menu|bom dia|boa tarde|boa noite|oi|olá|ola)$/i.test(msg.body)) {
+      const contact = await msg.getContact();
+      const name = contact.pushname || 'Usuário';
+      await client.sendMessage(
+        msg.from,
+        `Olá, ${name.split(' ')[0]}! Sou o assistente virtual da empresa. Como posso ajudar?\n1 - Como funciona\n2 - Planos\n3 - Benefícios`
+      );
+    }
+
+    if (text === '1') {
+      const chat = await msg.getChat();
+      await delay(2000);
+      await chat.sendStateTyping();
+      await delay(2000);
+      await client.sendMessage(
+        msg.from,
+        'Nosso serviço oferece consultas médicas 24 horas por dia, 7 dias por semana, diretamente pelo WhatsApp. Sem carência e com benefícios ilimitados.'
+      );
+      await delay(2000);
+      await client.sendMessage(
+        msg.from,
+        'COMO FUNCIONA?\n1. Faça seu cadastro.\n2. Efetue o pagamento.\n3. Comece a usar imediatamente!'
+      );
+      await delay(2000);
+      await client.sendMessage(msg.from, 'Link para cadastro: https://site.com');
+    }
+
+    if (text === '2') {
+      const chat = await msg.getChat();
+      await delay(2000);
+      await chat.sendStateTyping();
+      await delay(2000);
+      await client.sendMessage(
+        msg.from,
+        'Planos disponíveis:\n\nIndividual: R$22,50/mês\nFamília: R$39,90/mês (até 4 membros)\n\nPara mais detalhes, acesse: https://site.com'
+      );
+    }
   });
 
   client.initialize();
