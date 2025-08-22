@@ -3,21 +3,56 @@ const { createClient } = require('@supabase/supabase-js');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const qrcode = require('qrcode');
-const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
-let qrCodeImage = null; // QR gerado temporariamente
+let qrCodeImage = null;
 
 // Configuração do Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Função para buscar sessão no Supabase
+// ---------- Funções de sessão ----------
+
+// Salvar sessão no Supabase
+const saveSessionToSupabase = async (authPath) => {
+  const sessionData = {};
+
+  const readFolder = (folder, obj) => {
+    if (!fs.existsSync(folder)) return;
+    fs.readdirSync(folder).forEach((item) => {
+      const itemPath = path.join(folder, item);
+      const stats = fs.statSync(itemPath);
+      if (stats.isDirectory()) {
+        obj[item] = {};
+        readFolder(itemPath, obj[item]);
+      } else if (stats.isFile()) {
+        obj[item] = fs.readFileSync(itemPath, 'base64');
+      }
+    });
+  };
+
+  readFolder(authPath, sessionData);
+
+  const { error } = await supabase
+    .from('whatsapp_sessions')
+    .upsert({
+      id: 'default_session',
+      session_data: JSON.stringify(sessionData),
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) console.error('Erro ao salvar sessão no Supabase:', error.message);
+  else console.log('✅ Sessão salva com sucesso no Supabase!');
+};
+
+// Buscar sessão no Supabase
 const getSessionFromSupabase = async () => {
   const { data, error } = await supabase
     .from('whatsapp_sessions')
     .select('session_data')
     .eq('id', 'default_session')
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Erro ao buscar sessão:', error.message);
@@ -25,63 +60,51 @@ const getSessionFromSupabase = async () => {
   }
 
   if (!data?.session_data) {
-    console.log('Nenhuma sessão encontrada no Supabase. Será necessário escanear o QR Code.');
+    console.log('🔑 Nenhuma sessão encontrada no Supabase.');
     return null;
   }
 
-  if (typeof data.session_data === 'string') {
-    try {
-      return JSON.parse(data.session_data);
-    } catch (err) {
-      console.error('Erro ao parsear sessão do Supabase:', err.message);
-      return null;
-    }
-  } else {
-    return data.session_data;
-  }
-};
-
-// Função para salvar sessão no Supabase
-const saveSessionToSupabase = async (session) => {
-  if (!session || Object.keys(session).length === 0) return;
-  const { error } = await supabase
-    .from('whatsapp_sessions')
-    .upsert({
-      id: 'default_session',
-      session_data: JSON.stringify(session),
-      updated_at: new Date().toISOString(),
-    });
-  if (error) console.error('Erro ao salvar sessão no Supabase:', error.message);
-  else console.log('Sessão salva com sucesso no Supabase!');
-};
-
-// Função para enviar QR Code por e-mail via Brevo
-const sendEmailWithQRCode = async (qrImage) => {
   try {
-    const base64Image = qrImage.split(',')[1];
-    const emailData = {
-      sender: { email: process.env.EMAIL_FROM, name: 'Bot Assistente' },
-      to: [{ email: process.env.EMAIL_TO, name: 'Usuário' }],
-      subject: 'QR Code para conectar o bot',
-      htmlContent: `<p>Escaneie o QR Code para conectar o bot ao WhatsApp:</p><img src="data:image/png;base64,${base64Image}" alt="QR Code">`,
-      attachments: [{ name: 'qrcode.png', content: base64Image }],
-    };
-    await axios.post('https://api.brevo.com/v3/smtp/email', emailData, {
-      headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json' },
-    });
-    console.log('QR Code enviado por e-mail com sucesso!');
-  } catch (error) {
-    console.error('Erro ao enviar QR Code por e-mail:', error.response?.data || error.message);
+    return JSON.parse(data.session_data);
+  } catch (err) {
+    console.error('Erro ao parsear sessão do Supabase:', err.message);
+    return null;
   }
 };
 
-// Inicializa o cliente WhatsApp
+// Restaurar sessão do Supabase para a pasta LocalAuth
+const restoreSessionToLocal = (sessionData, authPath) => {
+  const writeFolder = (folder, obj) => {
+    if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+
+    for (const key in obj) {
+      const itemPath = path.join(folder, key);
+      if (typeof obj[key] === 'object') {
+        writeFolder(itemPath, obj[key]);
+      } else {
+        fs.writeFileSync(itemPath, Buffer.from(obj[key], 'base64'));
+      }
+    }
+  };
+
+  writeFolder(authPath, sessionData);
+};
+
+// ---------- Inicializa WhatsApp ----------
+
 const initializeWhatsAppClient = async () => {
+  const authPath = './.wwebjs_auth/default';
   const sessionData = await getSessionFromSupabase();
+
+  if (sessionData) {
+    console.log('💾 Sessão encontrada no Supabase, restaurando para LocalAuth...');
+    restoreSessionToLocal(sessionData, authPath);
+  } else {
+    console.log('🔑 Nenhuma sessão encontrada, será gerado um novo QR Code.');
+  }
 
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: "default" }),
-    session: sessionData || undefined,
     puppeteer: {
       headless: true,
       args: [
@@ -100,11 +123,10 @@ const initializeWhatsAppClient = async () => {
     console.log("QR Code gerado, escaneie para conectar:");
     qrcodeTerminal.generate(qr, { small: true });
     qrCodeImage = await qrcode.toDataURL(qr);
-    await sendEmailWithQRCode(qrCodeImage);
   });
 
   client.on("authenticated", async (session) => {
-    console.log("Sessão autenticada!");
+    console.log('✅ Sessão autenticada! Fazendo backup no Supabase...');
     await saveSessionToSupabase(session);
     qrCodeImage = null;
   });
@@ -123,7 +145,7 @@ const initializeWhatsAppClient = async () => {
     console.error("⚠️ Falha na autenticação:", msg);
   });
 
-  // Listener de mensagens
+  // ---------- Listener de mensagens ----------
   client.on('message', async (msg) => {
     const text = msg.body.trim().toLowerCase();
     const delay = (ms) => new Promise(res => setTimeout(res, ms));
@@ -165,12 +187,17 @@ const initializeWhatsAppClient = async () => {
         'Planos disponíveis:\n\nIndividual: R$22,50/mês\nFamília: R$39,90/mês (até 4 membros)\n\nPara mais detalhes, acesse: https://site.com'
       );
     }
+
+    if (text === '3') {
+      await client.sendMessage(msg.from, 'Benefícios: Atendimento 24/7, consultas ilimitadas, suporte VIP.');
+    }
   });
 
   client.initialize();
 };
 
-// Servidor Express
+// ---------- Servidor Express ----------
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
